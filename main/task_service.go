@@ -2,18 +2,16 @@ package main
 
 import (
 	"fmt"
-	"github.com/redis/go-redis/v9"
 	"time"
 )
 
 type TaskService struct {
-	queue       *PriorityQueue
-	store       *TaskStore
-	redisClient *redis.Client
+	queue *PriorityQueue
+	store *TaskStore
 }
 
-func NewTaskService(queue *PriorityQueue, store *TaskStore, redisClient *redis.Client) *TaskService {
-	return &TaskService{queue: queue, store: store, redisClient: redisClient}
+func NewTaskService(queue *PriorityQueue, store *TaskStore) *TaskService {
+	return &TaskService{queue: queue, store: store}
 }
 
 func (s *TaskService) SubmitTask(priorityStr string, payload []byte) (string, error) {

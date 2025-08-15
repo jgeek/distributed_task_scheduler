@@ -10,19 +10,20 @@ import (
 )
 
 type NodeService struct {
+	NodeID        string
 	taskService   *TaskService
 	leaderService *LeaderElectionService
-	queue         *PriorityQueue
-	redisClient   *redis.Client
+	pool          *WorkerPool
 }
 
-func NewNodeService(cfg *Config, redisClient *redis.Client, taskService *TaskService) *NodeService {
+func NewNodeService(cfg *Config, nodeId string, redisClient *redis.Client, taskService *TaskService, pool *WorkerPool) *NodeService {
 	leaderService := NewLeaderElectionService(cfg, redisClient)
 	leaderService.Start()
 	return &NodeService{
+		NodeID:        nodeId,
 		taskService:   taskService,
 		leaderService: leaderService,
-		redisClient:   redisClient,
+		pool:          pool,
 	}
 }
 
@@ -61,7 +62,7 @@ func (n *NodeService) LoadPendingTasks() {
 	}
 }
 
-func (n *NodeService) StartWorkerPool(ctx context.Context, workerPool *WorkerPool, nodeID string) {
+func (n *NodeService) StartWorkerPool(ctx context.Context, nodeID string) {
 
 	// Task processing function
 	taskProcessor := func(task *Task) error {
@@ -84,11 +85,11 @@ func (n *NodeService) StartWorkerPool(ctx context.Context, workerPool *WorkerPoo
 				workerMu.Lock()
 				if n.IsLeader() && !workerStarted {
 					log.Printf("Node %s became leader, starting worker pool", nodeID)
-					workerPool.Start(taskProcessor)
+					n.pool.Start(taskProcessor)
 					workerStarted = true
 				} else if !n.IsLeader() && workerStarted {
 					log.Printf("Node %s lost leadership, stopping worker pool", nodeID)
-					workerPool.Stop()
+					n.pool.Stop()
 					workerStarted = false
 				}
 				workerMu.Unlock()

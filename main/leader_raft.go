@@ -15,50 +15,16 @@ import (
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 )
 
-// RaftLeaderElectionStrategy implements LeaderElection for Raft
-// (adapts existing NewRaftLeaderElection)
 type RaftLeaderElectionStrategy struct {
-	le *RaftLeaderElection
-}
-
-func NewRaftLeaderElectionStrategy(dataDir, nodeID, bindAddr string, peers []string) (*RaftLeaderElectionStrategy, error) {
-	le, err := NewRaftLeaderElection(dataDir, nodeID, bindAddr, peers)
-	if err != nil {
-		return nil, err
-	}
-	return &RaftLeaderElectionStrategy{le: le}, nil
-}
-
-func (r *RaftLeaderElectionStrategy) Start() {
-	go func() {
-		log.Println("Waiting for Raft leader election...")
-		leader := r.le.WaitForLeader(10 * time.Second)
-		if leader == "" {
-			log.Println("No leader elected within timeout, continuing...")
-		} else {
-			log.Printf("Raft leader elected: %s", leader)
-		}
-	}()
-}
-
-func (r *RaftLeaderElectionStrategy) IsLeader() bool {
-	return r.le.IsLeader()
-}
-
-func (r *RaftLeaderElectionStrategy) GetLeader() string {
-	return r.le.GetLeader()
-}
-
-func (r *RaftLeaderElectionStrategy) Stop() {
-	if err := r.le.Shutdown(); err != nil {
-		log.Printf("Error shutting down Raft: %v", err)
-	}
-}
-
-type RaftLeaderElection struct {
 	raftNode *raft.Raft
 	id       string
 	dataDir  string
+}
+
+func (r *RaftLeaderElectionStrategy) Stop() {
+	if r.raftNode != nil {
+		r.raftNode.Shutdown()
+	}
 }
 
 // RaftFSM implements raft.FSM for our task scheduler
@@ -86,9 +52,9 @@ func (s *RaftSnapshot) Persist(sink raft.SnapshotSink) error {
 
 func (s *RaftSnapshot) Release() {}
 
-func NewRaftLeaderElection(dataDir, id, bindAddr string, peers []string) (*RaftLeaderElection, error) {
+func NewRaftLeaderElectionStrategy(dataDir, nodeID, bindAddr string, peers []string) (*RaftLeaderElectionStrategy, error) {
 	config := raft.DefaultConfig()
-	config.LocalID = raft.ServerID(id)
+	config.LocalID = raft.ServerID(nodeID)
 	config.HeartbeatTimeout = 1000 * time.Millisecond
 	config.ElectionTimeout = 1000 * time.Millisecond
 	config.CommitTimeout = 500 * time.Millisecond
@@ -136,14 +102,12 @@ func NewRaftLeaderElection(dataDir, id, bindAddr string, peers []string) (*RaftL
 	}
 
 	// Bootstrap cluster if this is the first node
-	if len(peers) == 0 || (len(peers) == 1 && peers[0] == id) {
+	if len(peers) == 0 || (len(peers) == 1 && peers[0] == nodeID) {
 		cfg := raft.Configuration{
-			Servers: []raft.Server{
-				{
-					ID:      raft.ServerID(id),
-					Address: raft.ServerAddress(bindAddr),
-				},
-			},
+			Servers: []raft.Server{{
+				ID:      raft.ServerID(nodeID),
+				Address: raft.ServerAddress(bindAddr),
+			}},
 		}
 		future := raftNode.BootstrapCluster(cfg)
 		if err := future.Error(); err != nil {
@@ -151,36 +115,48 @@ func NewRaftLeaderElection(dataDir, id, bindAddr string, peers []string) (*RaftL
 		}
 	}
 
-	return &RaftLeaderElection{
+	return &RaftLeaderElectionStrategy{
 		raftNode: raftNode,
-		id:       id,
+		id:       nodeID,
 		dataDir:  dataDir,
 	}, nil
 }
 
-func (le *RaftLeaderElection) IsLeader() bool {
-	return le.raftNode.State() == raft.Leader
+func (r *RaftLeaderElectionStrategy) Start() {
+	go func() {
+		log.Println("Waiting for Raft leader election...")
+		leader := r.WaitForLeader(10 * time.Second)
+		if leader == "" {
+			log.Println("No leader elected within timeout, continuing...")
+		} else {
+			log.Printf("Raft leader elected: %s", leader)
+		}
+	}()
 }
 
-func (le *RaftLeaderElection) GetLeader() string {
-	return string(le.raftNode.Leader())
+func (r *RaftLeaderElectionStrategy) IsLeader() bool {
+	return r.raftNode.State() == raft.Leader
 }
 
-func (le *RaftLeaderElection) AddVoter(id, address string) error {
-	future := le.raftNode.AddVoter(raft.ServerID(id), raft.ServerAddress(address), 0, 0)
+func (r *RaftLeaderElectionStrategy) GetLeader() string {
+	return string(r.raftNode.Leader())
+}
+
+func (r *RaftLeaderElectionStrategy) AddVoter(id, address string) error {
+	future := r.raftNode.AddVoter(raft.ServerID(id), raft.ServerAddress(address), 0, 0)
 	return future.Error()
 }
 
-func (le *RaftLeaderElection) RemoveServer(id string) error {
-	future := le.raftNode.RemoveServer(raft.ServerID(id), 0, 0)
+func (r *RaftLeaderElectionStrategy) RemoveServer(id string) error {
+	future := r.raftNode.RemoveServer(raft.ServerID(id), 0, 0)
 	return future.Error()
 }
 
-func (le *RaftLeaderElection) Shutdown() error {
-	return le.raftNode.Shutdown().Error()
+func (r *RaftLeaderElectionStrategy) Shutdown() error {
+	return r.raftNode.Shutdown().Error()
 }
 
-func (le *RaftLeaderElection) WaitForLeader(timeout time.Duration) string {
+func (r *RaftLeaderElectionStrategy) WaitForLeader(timeout time.Duration) string {
 	// Wait for leadership to be established
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
@@ -193,7 +169,7 @@ func (le *RaftLeaderElection) WaitForLeader(timeout time.Duration) string {
 		case <-timer.C:
 			return ""
 		case <-ticker.C:
-			if leader := le.GetLeader(); leader != "" {
+			if leader := r.GetLeader(); leader != "" {
 				return leader
 			}
 		}

@@ -17,16 +17,16 @@ func main() {
 
 	queue := NewPriorityQueue()
 	redisClient := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
-	store := NewTaskStore(cfg.RedisAddr, "", 0)
-	taskService := NewTaskService(queue, store, redisClient)
-	nodeService := NewNodeService(cfg, redisClient, taskService)
+	store := NewTaskStore(redisClient)
+	taskService := NewTaskService(queue, store)
+	workerPool := NewWorkerPool(cfg.WorkerCount, queue, store)
+	nodeService := NewNodeService(cfg, cfg.NodeID, redisClient, taskService, workerPool)
 
 	defer nodeService.Close()
 
 	nodeService.LoadPendingTasks()
 
-	workerPool := NewWorkerPool(cfg.WorkerCount, queue, store)
-	nodeService.StartWorkerPool(ctx, workerPool, cfg.NodeID)
+	nodeService.StartWorkerPool(ctx, cfg.NodeID)
 
 	RegisterRESTEndpoints(cfg, nodeService)
 
