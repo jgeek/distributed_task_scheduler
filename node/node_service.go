@@ -3,20 +3,19 @@ package node
 import (
 	"context"
 	"distributed_task_scheduler/leader"
-	task2 "distributed_task_scheduler/task"
+	"distributed_task_scheduler/task"
 	"log"
 	"sync"
 	"time"
 )
 
 type Service struct {
-	taskService   *task2.TaskService
+	taskService   *task.TaskService
 	leaderService *leader.LeaderElectionService
 	pool          *WorkerPool
 }
 
-func NewService(taskService *task2.TaskService, pool *WorkerPool, leaderService *leader.LeaderElectionService) *Service {
-	leaderService.Start()
+func NewService(taskService *task.TaskService, pool *WorkerPool, leaderService *leader.LeaderElectionService) *Service {
 	return &Service{
 		taskService:   taskService,
 		leaderService: leaderService,
@@ -49,6 +48,10 @@ func (s *Service) LeaderID() string {
 }
 
 func (s *Service) LoadPendingTasks() {
+	if !s.IsLeader() {
+		log.Println("Not leader, skipping loading pending tasks from Redis")
+		return
+	}
 	pendingTasks, err := s.taskService.Store.LoadPendingTasks()
 	if err == nil {
 		for _, t := range pendingTasks {
@@ -58,12 +61,22 @@ func (s *Service) LoadPendingTasks() {
 	}
 }
 
+func (s *Service) Start(ctx context.Context) {
+	nodeID := s.leaderService.NodeId()
+	log.Printf("Starting node service with ID: %s", nodeID)
+
+	s.leaderService.Start()
+	s.LoadPendingTasks()
+	s.StartWorkerPool(ctx, nodeID)
+	s.LoadNewlyAddedTaskFromRedis(ctx)
+}
+
 func (s *Service) StartWorkerPool(ctx context.Context, nodeID string) {
 
 	var workerStarted bool
 	var workerMu sync.Mutex
 
-	taskProcessor := func(task *task2.Task) error {
+	taskProcessor := func(task *task.Task) error {
 		log.Printf("Processing task %s with priority %d", task.ID, task.Priority)
 		// Simulate task processing
 		time.Sleep(100 * time.Millisecond)
@@ -92,16 +105,14 @@ func (s *Service) StartWorkerPool(ctx context.Context, nodeID string) {
 			}
 		}
 	}()
-
-	s.loadNewTaskFromRedis(ctx)
 }
 
-func (s *Service) loadNewTaskFromRedis(ctx context.Context) {
+func (s *Service) LoadNewlyAddedTaskFromRedis(ctx context.Context) {
 	// Track task IDs in queue to avoid re-enqueueing
 	taskIDsInQueue := make(map[string]struct{})
 	var taskIDsMu sync.Mutex
 
-	pushIfNotExists := func(task *task2.Task) bool {
+	pushIfNotExists := func(task *task.Task) bool {
 		taskIDsMu.Lock()
 		defer taskIDsMu.Unlock()
 		if _, exists := taskIDsInQueue[task.ID]; exists {

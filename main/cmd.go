@@ -5,8 +5,8 @@ import (
 	"distributed_task_scheduler/conf"
 	"distributed_task_scheduler/handlers"
 	"distributed_task_scheduler/leader"
-	node2 "distributed_task_scheduler/node"
-	task2 "distributed_task_scheduler/task"
+	"distributed_task_scheduler/node"
+	"distributed_task_scheduler/task"
 	"github.com/redis/go-redis/v9"
 	"log"
 	"net/http"
@@ -20,19 +20,17 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	queue := task2.NewPriorityQueue()
+	queue := task.NewPriorityQueue()
 	redisClient := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
-	store := task2.NewTaskStore(redisClient)
-	taskService := task2.NewTaskService(queue, store)
-	workerPool := node2.NewWorkerPool(cfg.WorkerCount, queue, store)
+	store := task.NewTaskStore(redisClient)
+	taskService := task.NewTaskService(queue, store)
+	workerPool := node.NewWorkerPool(cfg.WorkerCount, queue, store)
 	leaderService := leader.NewLeaderElectionService(cfg, redisClient)
-	nodeService := node2.NewService(taskService, workerPool, leaderService)
+	nodeService := node.NewService(taskService, workerPool, leaderService)
 
 	defer nodeService.Close()
 
-	nodeService.LoadPendingTasks()
-
-	nodeService.StartWorkerPool(ctx, cfg.NodeID)
+	nodeService.Start(ctx)
 
 	handlers.RegisterRESTEndpoints(cfg, nodeService)
 
