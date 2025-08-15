@@ -44,7 +44,7 @@ func RegisterRESTEndpoints(cfg *conf.Config, nodeService *node.Service) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": status})
+		json.NewEncoder(w).Encode(map[string]string{"status": string(status)})
 	})
 
 	http.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
@@ -54,11 +54,7 @@ func RegisterRESTEndpoints(cfg *conf.Config, nodeService *node.Service) {
 		fmt.Fprintf(w, "scheduler_tasks_total %d\n", nodeService.QueueLen())
 		fmt.Fprintln(w, "# HELP scheduler_is_leader Node is leader")
 		fmt.Fprintln(w, "# TYPE scheduler_is_leader gauge")
-		if nodeService.IsLeader() {
-			fmt.Fprintln(w, "scheduler_is_leader 1")
-		} else {
-			fmt.Fprintln(w, "scheduler_is_leader 0")
-		}
+		fmt.Fprintf(w, "scheduler_is_leader{node=\"%s\"} %d\n", cfg.NodeID, boolToInt(nodeService.IsLeader()))
 	})
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -83,4 +79,11 @@ func RegisterRESTEndpoints(cfg *conf.Config, nodeService *node.Service) {
 		}
 		json.NewEncoder(w).Encode(map[string]string{"leader": leader})
 	})
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

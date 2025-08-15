@@ -53,11 +53,38 @@ func (ts *TaskStore) LoadPendingTasks() ([]*Task, error) {
 	return tasks, nil
 }
 
-func (ts *TaskStore) GetTaskStatus(id string) (string, error) {
+func (ts *TaskStore) Get(id string) (*Task, error) {
 	ctx := context.Background()
-	_, err := ts.client.Get(ctx, redisTaskPrefix+id).Result()
-	if err != nil {
-		return "completed", nil
+	val, err := ts.client.Get(ctx, redisTaskPrefix+id).Result()
+	t := &Task{}
+	if err = json.Unmarshal([]byte(val), t); err != nil {
+		return nil, err
 	}
-	return "pending", nil
+	return t, nil
+}
+func (ts *TaskStore) GetTaskStatus(id string) (Status, error) {
+	ctx := context.Background()
+	val, err := ts.client.Get(ctx, redisTaskPrefix+id).Result()
+	t := &Task{}
+	if err = json.Unmarshal([]byte(val), t); err != nil {
+		return "", err
+	}
+	return t.Status, nil
+}
+
+// UpdateStatus updates the status of a task by its ID.
+func (s *TaskStore) UpdateStatus(id string, status Status) error {
+	ctx := context.Background()
+	key := redisTaskPrefix + id
+	// Get the task
+	val, err := s.client.Get(ctx, key).Result()
+	if err != nil {
+		return err
+	}
+	t := &Task{}
+	if err = json.Unmarshal([]byte(val), t); err != nil {
+		return err
+	}
+	t.Status = status
+	return s.SaveTask(t)
 }

@@ -46,22 +46,29 @@ func (wp *WorkerPool) Start(process func(*task.Task) error) {
 					log.Printf("Worker %d stopping", workerID)
 					return
 				default:
-					task := wp.Queue.SafePop()
-					if task == nil {
+					t := wp.Queue.SafePop()
+					if t == nil {
 						time.Sleep(100 * time.Millisecond)
 						continue
 					}
-
-					log.Printf("Worker %d processing task %s", workerID, task.ID)
-					if err := process(task); err == nil {
-						// Task completed successfully, remove from Redis
-						if deleteErr := wp.Store.DeleteTask(task.ID); deleteErr != nil {
-							log.Printf("Failed to delete completed task %s: %v", task.ID, deleteErr)
+					err := wp.Store.UpdateStatus(t.ID, task.StatusInProgress)
+					if err != nil {
+						log.Printf("Worker %d failed to update status for task %s: %v", workerID, t.ID, err)
+						return
+					}
+					log.Printf("Worker %d processing task %s", workerID, t.ID)
+					if err := process(t); err == nil {
+						// Task completed successfully, update status to completed instead of deleting
+						if updateErr := wp.Store.UpdateStatus(t.ID, task.StatusCompleted); updateErr != nil {
+							log.Printf("Failed to update status for completed task %s: %v", t.ID, updateErr)
 						}
 					} else {
-						log.Printf("Worker %d: Task %s failed: %v", workerID, task.ID, err)
+						log.Printf("Worker %d: Task %s failed: %v", workerID, t.ID, err)
+						if updateErr := wp.Store.UpdateStatus(t.ID, task.StatusFailed); updateErr != nil {
+							log.Printf("Failed to update status for failed task %s: %v", t.ID, updateErr)
+						}
 						// Re-queue failed task (simple retry mechanism)
-						wp.Queue.SafePush(task)
+						//wp.Queue.SafePush(t)
 					}
 				}
 			}

@@ -31,6 +31,7 @@ func (s *TaskService) SubmitTask(priorityStr string, payload []byte) (string, er
 		ID:        fmt.Sprintf("task-%d", time.Now().UnixNano()),
 		Priority:  priority,
 		Payload:   payload,
+		Status:    StatusPending,
 		CreatedAt: time.Now(),
 	}
 	if err := s.Store.SaveTask(task); err != nil {
@@ -40,7 +41,7 @@ func (s *TaskService) SubmitTask(priorityStr string, payload []byte) (string, er
 	return task.ID, nil
 }
 
-func (s *TaskService) GetTaskStatus(id string) (string, error) {
+func (s *TaskService) GetTaskStatus(id string) (Status, error) {
 	return s.Store.GetTaskStatus(id)
 }
 

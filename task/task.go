@@ -14,11 +14,20 @@ const (
 )
 
 type TaskPriority int
+type Status string
+
+const (
+	StatusPending    Status = "pending"
+	StatusInProgress Status = "in_progress"
+	StatusCompleted  Status = "completed"
+	StatusFailed     Status = "failed"
+)
 
 type Task struct {
 	ID        string          `json:"id"`
 	Priority  TaskPriority    `json:"priority"`
 	Payload   json.RawMessage `json:"payload"`
+	Status    Status          `json:"status"`
 	CreatedAt time.Time       `json:"created_at"`
 }
 

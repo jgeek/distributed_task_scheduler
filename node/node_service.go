@@ -31,7 +31,7 @@ func (s *Service) SubmitTask(priority string, payload []byte) (string, error) {
 	return s.taskService.SubmitTask(priority, payload)
 }
 
-func (s *Service) GetTaskStatus(id string) (string, error) {
+func (s *Service) GetTaskStatus(id string) (task.Status, error) {
 	return s.taskService.GetTaskStatus(id)
 }
 
