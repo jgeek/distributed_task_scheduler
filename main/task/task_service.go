@@ -1,4 +1,4 @@
-package main
+package task
 
 import (
 	"fmt"
@@ -6,12 +6,12 @@ import (
 )
 
 type TaskService struct {
-	queue *PriorityQueue
-	store *TaskStore
+	Queue *PriorityQueue
+	Store *TaskStore
 }
 
 func NewTaskService(queue *PriorityQueue, store *TaskStore) *TaskService {
-	return &TaskService{queue: queue, store: store}
+	return &TaskService{Queue: queue, Store: store}
 }
 
 func (s *TaskService) SubmitTask(priorityStr string, payload []byte) (string, error) {
@@ -33,17 +33,17 @@ func (s *TaskService) SubmitTask(priorityStr string, payload []byte) (string, er
 		Payload:   payload,
 		CreatedAt: time.Now(),
 	}
-	if err := s.store.SaveTask(task); err != nil {
+	if err := s.Store.SaveTask(task); err != nil {
 		return "", err
 	}
-	s.queue.SafePush(task)
+	s.Queue.SafePush(task)
 	return task.ID, nil
 }
 
 func (s *TaskService) GetTaskStatus(id string) (string, error) {
-	return s.store.GetTaskStatus(id)
+	return s.Store.GetTaskStatus(id)
 }
 
 func (s *TaskService) QueueLen() int {
-	return s.queue.Len()
+	return s.Queue.Len()
 }

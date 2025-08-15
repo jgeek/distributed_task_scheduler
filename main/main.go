@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"distributed_task_scheduler/main/conf"
+	"distributed_task_scheduler/main/leader"
+	"distributed_task_scheduler/main/node"
+	"distributed_task_scheduler/main/task"
 	"github.com/redis/go-redis/v9"
 	"log"
 	"net/http"
@@ -11,16 +15,17 @@ import (
 )
 
 func main() {
-	cfg := LoadConfig()
+	cfg := conf.LoadConfig()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	queue := NewPriorityQueue()
+	queue := task.NewPriorityQueue()
 	redisClient := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
-	store := NewTaskStore(redisClient)
-	taskService := NewTaskService(queue, store)
-	workerPool := NewWorkerPool(cfg.WorkerCount, queue, store)
-	nodeService := NewNodeService(cfg, cfg.NodeID, redisClient, taskService, workerPool)
+	store := task.NewTaskStore(redisClient)
+	taskService := task.NewTaskService(queue, store)
+	workerPool := node.NewWorkerPool(cfg.WorkerCount, queue, store)
+	leaderService := leader.NewLeaderElectionService(cfg, redisClient)
+	nodeService := node.NewNodeService(taskService, workerPool, leaderService)
 
 	defer nodeService.Close()
 
@@ -43,7 +48,7 @@ func main() {
 	_ = server.Shutdown(context.Background())
 }
 
-func setupServer(cfg *Config) *http.Server {
+func setupServer(cfg *conf.Config) *http.Server {
 	server := &http.Server{Addr: cfg.ListenAddr}
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

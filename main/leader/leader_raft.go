@@ -1,7 +1,4 @@
-// Raft-based Leader Election using hashicorp/raft
-// File: main/leader_raft.go
-
-package main
+package leader
 
 import (
 	"io"
@@ -17,13 +14,17 @@ import (
 
 type RaftLeaderElectionStrategy struct {
 	raftNode *raft.Raft
-	id       string
+	nodeID   string
 	dataDir  string
 }
 
 func (r *RaftLeaderElectionStrategy) Stop() {
 	if r.raftNode != nil {
-		r.raftNode.Shutdown()
+		// Gracefully shutdown Raft node
+		future := r.raftNode.Shutdown()
+		if err := future.Error(); err != nil {
+			log.Printf("Error shutting down Raft node: %v", err)
+		}
 	}
 }
 
@@ -117,7 +118,7 @@ func NewRaftLeaderElectionStrategy(dataDir, nodeID, bindAddr string, peers []str
 
 	return &RaftLeaderElectionStrategy{
 		raftNode: raftNode,
-		id:       nodeID,
+		nodeID:   nodeID,
 		dataDir:  dataDir,
 	}, nil
 }
@@ -140,6 +141,10 @@ func (r *RaftLeaderElectionStrategy) IsLeader() bool {
 
 func (r *RaftLeaderElectionStrategy) GetLeader() string {
 	return string(r.raftNode.Leader())
+}
+
+func (r *RaftLeaderElectionStrategy) NodeId() string {
+	return r.nodeID
 }
 
 func (r *RaftLeaderElectionStrategy) AddVoter(id, address string) error {

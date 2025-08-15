@@ -1,13 +1,15 @@
 package main
 
 import (
+	"distributed_task_scheduler/main/conf"
+	"distributed_task_scheduler/main/node"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 )
 
-func RegisterRESTEndpoints(cfg *Config, nodeService *NodeService) {
+func RegisterRESTEndpoints(cfg *conf.Config, nodeService *node.NodeService) {
 	http.HandleFunc("/submit", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)

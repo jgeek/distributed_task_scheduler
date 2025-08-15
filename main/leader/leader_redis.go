@@ -1,7 +1,4 @@
-// Redis-based Leader Election for Distributed Task Scheduler
-// File: main/leader_redis.go
-
-package main
+package leader
 
 import (
 	"context"
@@ -18,7 +15,7 @@ const (
 
 type RedisLeaderElectionStrategy struct {
 	client *redis.Client
-	id     string // Node ID
+	nodeID string
 	leader bool
 	mu     sync.Mutex
 	stop   chan struct{}
@@ -27,7 +24,7 @@ type RedisLeaderElectionStrategy struct {
 func NewRedisLeaderElectionStrategy(client *redis.Client, nodeID string) *RedisLeaderElectionStrategy {
 	return &RedisLeaderElectionStrategy{
 		client: client,
-		id:     nodeID,
+		nodeID: nodeID,
 		leader: false,
 		stop:   make(chan struct{}),
 	}
@@ -48,12 +45,12 @@ func (r *RedisLeaderElectionStrategy) Start() {
 				if !prevLeader {
 					r.leader = r.TryBecomeLeader()
 					if r.leader && !prevLeader {
-						log.Printf("Node %s became leader", r.id)
+						log.Printf("Node %s became leader", r.nodeID)
 					}
 				} else {
 					r.leader = r.Heartbeat()
 					if !r.leader && prevLeader {
-						log.Printf("Node %s lost leadership", r.id)
+						log.Printf("Node %s lost leadership", r.nodeID)
 					}
 				}
 				r.mu.Unlock()
@@ -65,7 +62,7 @@ func (r *RedisLeaderElectionStrategy) Start() {
 
 func (r *RedisLeaderElectionStrategy) TryBecomeLeader() bool {
 	ctx := context.Background()
-	ok, err := r.client.SetNX(ctx, redisLeaderKey, r.id, leaderTTL).Result()
+	ok, err := r.client.SetNX(ctx, redisLeaderKey, r.nodeID, leaderTTL).Result()
 	if err != nil {
 		return false
 	}
@@ -73,11 +70,11 @@ func (r *RedisLeaderElectionStrategy) TryBecomeLeader() bool {
 	return ok
 }
 
-// Renew leader heartbeat if this node is leader
+// Heartbeat Renew leader heartbeat if this node is leader
 func (r *RedisLeaderElectionStrategy) Heartbeat() bool {
 	ctx := context.Background()
 	val, err := r.client.Get(ctx, redisLeaderKey).Result()
-	if err != nil || val != r.id {
+	if err != nil || val != r.nodeID {
 		r.leader = false
 		return false
 	}
@@ -87,7 +84,6 @@ func (r *RedisLeaderElectionStrategy) Heartbeat() bool {
 	return true
 }
 
-// Check current leader
 func (r *RedisLeaderElectionStrategy) GetLeader() string {
 	ctx := context.Background()
 	result, err := r.client.Get(ctx, redisLeaderKey).Result()
@@ -98,11 +94,10 @@ func (r *RedisLeaderElectionStrategy) GetLeader() string {
 	return result
 }
 
-// Step down as leader
 func (r *RedisLeaderElectionStrategy) StepDown() error {
 	ctx := context.Background()
 	val, err := r.client.Get(ctx, redisLeaderKey).Result()
-	if err == nil && val == r.id {
+	if err == nil && val == r.nodeID {
 		return r.client.Del(ctx, redisLeaderKey).Err()
 	}
 	return nil
@@ -116,4 +111,8 @@ func (r *RedisLeaderElectionStrategy) IsLeader() bool {
 
 func (r *RedisLeaderElectionStrategy) Stop() {
 	close(r.stop)
+}
+
+func (r *RedisLeaderElectionStrategy) NodeId() string {
+	return r.nodeID
 }

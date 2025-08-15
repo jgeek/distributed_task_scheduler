@@ -1,6 +1,7 @@
-package main
+package node
 
 import (
+	"distributed_task_scheduler/main/task"
 	"log"
 	"sync"
 	"time"
@@ -8,14 +9,14 @@ import (
 
 type WorkerPool struct {
 	NumWorkers int
-	Queue      *PriorityQueue
-	Store      *TaskStore
+	Queue      *task.PriorityQueue
+	Store      *task.TaskStore
 	stopCh     chan struct{}
 	isRunning  bool
 	mu         sync.Mutex
 }
 
-func NewWorkerPool(num int, queue *PriorityQueue, store *TaskStore) *WorkerPool {
+func NewWorkerPool(num int, queue *task.PriorityQueue, store *task.TaskStore) *WorkerPool {
 	return &WorkerPool{
 		NumWorkers: num,
 		Queue:      queue,
@@ -25,7 +26,7 @@ func NewWorkerPool(num int, queue *PriorityQueue, store *TaskStore) *WorkerPool 
 	}
 }
 
-func (wp *WorkerPool) Start(process func(*Task) error) {
+func (wp *WorkerPool) Start(process func(*task.Task) error) {
 	wp.mu.Lock()
 	defer wp.mu.Unlock()
 

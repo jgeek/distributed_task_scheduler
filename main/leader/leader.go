@@ -1,35 +1,35 @@
-package main
+package leader
 
 import (
+	"distributed_task_scheduler/main/conf"
 	"github.com/redis/go-redis/v9"
 	"log"
 )
 
-// LeaderElection defines the interface for leader election strategies
-// (Strategy Pattern)
 type LeaderElection interface {
 	Start()
 	IsLeader() bool
 	GetLeader() string
 	Stop()
+	NodeId() string
 }
 
-// LeaderElectionService wraps the leader election strategy and exposes its API
-// for use by the rest of the application.
 type LeaderElectionService struct {
 	strategy LeaderElection
 }
 
-func NewLeaderElectionService(cfg *Config, redisClient *redis.Client) *LeaderElectionService {
+func NewLeaderElectionService(cfg *conf.Config, redisClient *redis.Client) *LeaderElectionService {
 	var strategy LeaderElection
 	if cfg.LeaderType == "redis" {
 		strategy = NewRedisLeaderElectionStrategy(redisClient, cfg.NodeID)
-	} else {
+	} else if cfg.LeaderType == "raft" {
 		le, err := NewRaftLeaderElectionStrategy(cfg.RaftDataDir, cfg.NodeID, cfg.RaftBindAddr, []string{})
 		if err != nil {
 			log.Fatalf("Failed to create Raft leader election: %v", err)
 		}
 		strategy = le
+	} else {
+		log.Fatalf("Unsupported leader election type: %s", cfg.LeaderType)
 	}
 	return &LeaderElectionService{strategy: strategy}
 }
@@ -48,4 +48,8 @@ func (s *LeaderElectionService) IsLeader() bool {
 
 func (s *LeaderElectionService) GetLeader() string {
 	return s.strategy.GetLeader()
+}
+
+func (s *LeaderElectionService) NodeId() string {
+	return s.strategy.NodeId()
 }
