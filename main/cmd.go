@@ -26,7 +26,7 @@ func main() {
 	taskService := task.NewTaskService(queue, store)
 	workerPool := node.NewWorkerPool(cfg.WorkerCount, queue, store)
 	leaderService := leader.NewLeaderElectionService(cfg, redisClient)
-	nodeService := node.NewService(taskService, workerPool, leaderService)
+	nodeService := node.NewService(taskService, workerPool, leaderService, cfg.RaftBootstrap)
 
 	defer nodeService.Close()
 
@@ -34,7 +34,7 @@ func main() {
 
 	handlers.RegisterRESTEndpoints(cfg, nodeService)
 
-	log.Printf("Node %s starting on %s (leader election: %s)", cfg.NodeID, cfg.ListenAddr, cfg.LeaderType)
+	log.Printf("Node %s starting on %s (leader election: %s)", cfg.NodeID, cfg.ListenAddr, cfg.ConsensusType)
 
 	server := setupServer(cfg)
 

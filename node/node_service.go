@@ -13,13 +13,15 @@ type Service struct {
 	taskService   *task.TaskService
 	leaderService *leader.LeaderElectionService
 	pool          *WorkerPool
+	RaftBootstrap bool
 }
 
-func NewService(taskService *task.TaskService, pool *WorkerPool, leaderService *leader.LeaderElectionService) *Service {
+func NewService(taskService *task.TaskService, pool *WorkerPool, leaderService *leader.LeaderElectionService, raftBootstrap bool) *Service {
 	return &Service{
 		taskService:   taskService,
 		leaderService: leaderService,
 		pool:          pool,
+		RaftBootstrap: raftBootstrap,
 	}
 }
 
@@ -67,17 +69,17 @@ func (s *Service) Start(ctx context.Context) {
 
 	s.leaderService.Start()
 	s.LoadPendingTasks()
-	s.StartWorkerPool(ctx, nodeID)
+	s.StartWorkerPool(ctx)
 	s.LoadNewlyAddedTaskFromRedis(ctx)
 }
 
-func (s *Service) StartWorkerPool(ctx context.Context, nodeID string) {
+func (s *Service) StartWorkerPool(ctx context.Context) {
 
 	var workerStarted bool
 	var workerMu sync.Mutex
 
 	taskProcessor := func(task *task.Task) error {
-		log.Printf("Processing task %s with priority %d", task.ID, task.Priority)
+		log.Printf("Node: %s, processing task %s with priority %d", s.leaderService.NodeId(), task.ID, task.Priority)
 		// Simulate task processing
 		time.Sleep(100 * time.Millisecond)
 		return nil

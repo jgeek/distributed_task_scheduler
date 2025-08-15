@@ -20,16 +20,16 @@ type LeaderElectionService struct {
 
 func NewLeaderElectionService(cfg *conf.Config, redisClient *redis.Client) *LeaderElectionService {
 	var strategy LeaderElection
-	if cfg.LeaderType == "redis" {
+	if cfg.ConsensusType == "redis" {
 		strategy = NewRedisLeaderElectionStrategy(redisClient, cfg.NodeID)
-	} else if cfg.LeaderType == "raft" {
+	} else if cfg.ConsensusType == "raft" {
 		le, err := NewRaftLeaderElectionStrategy(cfg.RaftDataDir, cfg.NodeID, cfg.RaftBindAddr, []string{})
 		if err != nil {
 			log.Fatalf("Failed to create Raft leader election: %v", err)
 		}
 		strategy = le
 	} else {
-		log.Fatalf("Unsupported leader election type: %s", cfg.LeaderType)
+		log.Fatalf("Unsupported leader election type: %s", cfg.ConsensusType)
 	}
 	return &LeaderElectionService{strategy: strategy}
 }

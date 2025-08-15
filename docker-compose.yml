@@ -28,7 +28,7 @@ services:
       - NODE_ID=node1
       - REDIS_ADDR=redis:6379
       - LISTEN_ADDR=:8080
-      - LEADER_TYPE=redis
+      - CONSENSUS_TYPE=redis
       - WORKER_COUNT=4
       - RAFT_BIND_ADDR=node1:9900
       - RAFT_DATA_DIR=/tmp/raft-node1
@@ -39,6 +39,8 @@ services:
       - task-scheduler-network
     volumes:
       - node1_data:/tmp/raft-node1
+    profiles:
+      - redis
 
   node2:
     build:
@@ -52,7 +54,7 @@ services:
       - NODE_ID=node2
       - REDIS_ADDR=redis:6379
       - LISTEN_ADDR=:8080
-      - LEADER_TYPE=redis
+      - CONSENSUS_TYPE=redis
       - WORKER_COUNT=4
       - RAFT_BIND_ADDR=node2:9900
       - RAFT_DATA_DIR=/tmp/raft-node2
@@ -63,6 +65,8 @@ services:
       - task-scheduler-network
     volumes:
       - node2_data:/tmp/raft-node2
+    profiles:
+      - redis
 
   node3:
     build:
@@ -76,7 +80,7 @@ services:
       - NODE_ID=node3
       - REDIS_ADDR=redis:6379
       - LISTEN_ADDR=:8080
-      - LEADER_TYPE=redis
+      - CONSENSUS_TYPE=redis
       - WORKER_COUNT=4
       - RAFT_BIND_ADDR=node3:9900
       - RAFT_DATA_DIR=/tmp/raft-node3
@@ -87,6 +91,8 @@ services:
       - task-scheduler-network
     volumes:
       - node3_data:/tmp/raft-node3
+    profiles:
+      - redis
 
   # Raft cluster example (alternative to Redis leader election)
   raft-node1:
@@ -101,7 +107,8 @@ services:
       - NODE_ID=raft-node1
       - REDIS_ADDR=redis:6379
       - LISTEN_ADDR=:8080
-      - LEADER_TYPE=raft
+      - CONSENSUS_TYPE=raft
+      - RAFT_BOOTSTRAP=true
       - WORKER_COUNT=4
       - RAFT_BIND_ADDR=raft-node1:9900
       - RAFT_DATA_DIR=/tmp/raft-raft-node1
@@ -127,10 +134,11 @@ services:
       - NODE_ID=raft-node2
       - REDIS_ADDR=redis:6379
       - LISTEN_ADDR=:8080
-      - LEADER_TYPE=raft
+      - CONSENSUS_TYPE=raft
       - WORKER_COUNT=4
       - RAFT_BIND_ADDR=raft-node2:9900
       - RAFT_DATA_DIR=/tmp/raft-raft-node2
+      - RAFT_LEADER_ADDR=raft-node1:9900  # Join raft-node1
     depends_on:
       redis:
         condition: service_healthy

@@ -102,17 +102,35 @@ func NewRaftLeaderElectionStrategy(dataDir, nodeID, bindAddr string, peers []str
 		return nil, err
 	}
 
-	// Bootstrap cluster if this is the first node
-	if len(peers) == 0 || (len(peers) == 1 && peers[0] == nodeID) {
-		cfg := raft.Configuration{
-			Servers: []raft.Server{{
-				ID:      raft.ServerID(nodeID),
-				Address: raft.ServerAddress(bindAddr),
-			}},
+	// Use peers parameter to determine cluster membership
+	if len(peers) > 0 && peers[0] == nodeID {
+		// This node is the first in the list, bootstrap the cluster
+		var servers []raft.Server
+		for _, peer := range peers {
+			servers = append(servers, raft.Server{
+				ID:      raft.ServerID(peer),
+				Address: raft.ServerAddress(bindAddr), // Assumes all peers use the same bindAddr pattern
+			})
 		}
+		cfg := raft.Configuration{Servers: servers}
 		future := raftNode.BootstrapCluster(cfg)
 		if err := future.Error(); err != nil {
 			log.Printf("Failed to bootstrap cluster: %v", err)
+		}
+	} else if len(peers) > 0 {
+		// Join the cluster by contacting the first node (the default leader)
+		leaderID := peers[0]
+		if leaderID != nodeID {
+			go func() {
+				time.Sleep(2 * time.Second)
+				log.Printf("Attempting to join Raft cluster at leader %s", leaderID)
+				addVoterFuture := raftNode.AddVoter(raft.ServerID(nodeID), raft.ServerAddress(bindAddr), 0, 0)
+				if err := addVoterFuture.Error(); err != nil {
+					log.Printf("Failed to join Raft cluster: %v", err)
+				} else {
+					log.Printf("Successfully joined Raft cluster as voter: %s", nodeID)
+				}
+			}()
 		}
 	}
 
