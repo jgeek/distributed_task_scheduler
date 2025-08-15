@@ -1,0 +1,154 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: task-scheduler-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - task-scheduler-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 10s
+      retries: 5
+
+  node1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: task-scheduler-node1
+    ports:
+      - "8081:8080"
+      - "9901:9900"
+    environment:
+      - NODE_ID=node1
+      - REDIS_ADDR=redis:6379
+      - LISTEN_ADDR=:8080
+      - LEADER_TYPE=redis
+      - WORKER_COUNT=4
+      - RAFT_BIND_ADDR=node1:9900
+      - RAFT_DATA_DIR=/tmp/raft-node1
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - task-scheduler-network
+    volumes:
+      - node1_data:/tmp/raft-node1
+
+  node2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: task-scheduler-node2
+    ports:
+      - "8082:8080"
+      - "9902:9900"
+    environment:
+      - NODE_ID=node2
+      - REDIS_ADDR=redis:6379
+      - LISTEN_ADDR=:8080
+      - LEADER_TYPE=redis
+      - WORKER_COUNT=4
+      - RAFT_BIND_ADDR=node2:9900
+      - RAFT_DATA_DIR=/tmp/raft-node2
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - task-scheduler-network
+    volumes:
+      - node2_data:/tmp/raft-node2
+
+  node3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: task-scheduler-node3
+    ports:
+      - "8083:8080"
+      - "9903:9900"
+    environment:
+      - NODE_ID=node3
+      - REDIS_ADDR=redis:6379
+      - LISTEN_ADDR=:8080
+      - LEADER_TYPE=redis
+      - WORKER_COUNT=4
+      - RAFT_BIND_ADDR=node3:9900
+      - RAFT_DATA_DIR=/tmp/raft-node3
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - task-scheduler-network
+    volumes:
+      - node3_data:/tmp/raft-node3
+
+  # Raft cluster example (alternative to Redis leader election)
+  raft-node1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: task-scheduler-raft-node1
+    ports:
+      - "8091:8080"
+      - "9911:9900"
+    environment:
+      - NODE_ID=raft-node1
+      - REDIS_ADDR=redis:6379
+      - LISTEN_ADDR=:8080
+      - LEADER_TYPE=raft
+      - WORKER_COUNT=4
+      - RAFT_BIND_ADDR=raft-node1:9900
+      - RAFT_DATA_DIR=/tmp/raft-raft-node1
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - task-scheduler-network
+    volumes:
+      - raft_node1_data:/tmp/raft-raft-node1
+    profiles:
+      - raft
+
+  raft-node2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: task-scheduler-raft-node2
+    ports:
+      - "8092:8080"
+      - "9912:9900"
+    environment:
+      - NODE_ID=raft-node2
+      - REDIS_ADDR=redis:6379
+      - LISTEN_ADDR=:8080
+      - LEADER_TYPE=raft
+      - WORKER_COUNT=4
+      - RAFT_BIND_ADDR=raft-node2:9900
+      - RAFT_DATA_DIR=/tmp/raft-raft-node2
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - task-scheduler-network
+    volumes:
+      - raft_node2_data:/tmp/raft-raft-node2
+    profiles:
+      - raft
+
+networks:
+  task-scheduler-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  node1_data:
+  node2_data:
+  node3_data:
+  raft_node1_data:
+  raft_node2_data:

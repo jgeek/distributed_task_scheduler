@@ -1,7 +1,7 @@
 package leader
 
 import (
-	"distributed_task_scheduler/main/conf"
+	"distributed_task_scheduler/conf"
 	"github.com/redis/go-redis/v9"
 	"log"
 )
