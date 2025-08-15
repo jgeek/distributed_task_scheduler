@@ -112,6 +112,7 @@ services:
       - WORKER_COUNT=4
       - RAFT_BIND_ADDR=raft-node1:9900
       - RAFT_DATA_DIR=/tmp/raft-raft-node1
+      - RAFT_NODES=raft-node1:raft-node1:9900,raft-node2:raft-node2:9900
     depends_on:
       redis:
         condition: service_healthy
@@ -139,6 +140,7 @@ services:
       - RAFT_BIND_ADDR=raft-node2:9900
       - RAFT_DATA_DIR=/tmp/raft-raft-node2
       - RAFT_LEADER_ADDR=raft-node1:9900  # Join raft-node1
+      - RAFT_NODES=raft-node1:raft-node1:9900,raft-node2:raft-node2:9900
     depends_on:
       redis:
         condition: service_healthy

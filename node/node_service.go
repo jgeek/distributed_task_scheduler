@@ -11,17 +11,15 @@ import (
 
 type Service struct {
 	taskService   *task.TaskService
-	leaderService *leader.LeaderElectionService
+	leaderService *leader.ElectionService
 	pool          *WorkerPool
-	RaftBootstrap bool
 }
 
-func NewService(taskService *task.TaskService, pool *WorkerPool, leaderService *leader.LeaderElectionService, raftBootstrap bool) *Service {
+func NewService(taskService *task.TaskService, pool *WorkerPool, leaderService *leader.ElectionService) *Service {
 	return &Service{
 		taskService:   taskService,
 		leaderService: leaderService,
 		pool:          pool,
-		RaftBootstrap: raftBootstrap,
 	}
 }
 
@@ -63,14 +61,18 @@ func (s *Service) LoadPendingTasks() {
 	}
 }
 
-func (s *Service) Start(ctx context.Context) {
+func (s *Service) Start(ctx context.Context) error {
 	nodeID := s.leaderService.NodeId()
 	log.Printf("Starting node service with ID: %s", nodeID)
 
-	s.leaderService.Start()
+	err := s.leaderService.Start()
+	if err != nil {
+		return err
+	}
 	s.LoadPendingTasks()
 	s.StartWorkerPool(ctx)
 	s.LoadNewlyAddedTaskFromRedis(ctx)
+	return nil
 }
 
 func (s *Service) StartWorkerPool(ctx context.Context) {

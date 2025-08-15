@@ -26,11 +26,14 @@ func main() {
 	taskService := task.NewTaskService(queue, store)
 	workerPool := node.NewWorkerPool(cfg.WorkerCount, queue, store)
 	leaderService := leader.NewLeaderElectionService(cfg, redisClient)
-	nodeService := node.NewService(taskService, workerPool, leaderService, cfg.RaftBootstrap)
+	nodeService := node.NewService(taskService, workerPool, leaderService)
 
 	defer nodeService.Close()
 
-	nodeService.Start(ctx)
+	err := nodeService.Start(ctx)
+	if err != nil {
+		log.Fatalf("Failed to start node : %v", err)
+	}
 
 	handlers.RegisterRESTEndpoints(cfg, nodeService)
 

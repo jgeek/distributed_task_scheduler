@@ -33,31 +33,48 @@ func NewRedisLeaderElectionStrategy(client *redis.Client, nodeID string) *RedisL
 // Start launches the leader election loop in a separate goroutine.
 // It periodically attempts to become the leader if not already, or sends heartbeats if leader.
 // Leadership changes are logged. The loop stops when Stop() is called.
-func (r *RedisLeaderElectionStrategy) Start() {
+func (r *RedisLeaderElectionStrategy) Start() error {
+	tryElection := func() bool {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		prevLeader := r.leader
+		if !prevLeader {
+			r.leader = r.TryBecomeLeader()
+			if r.leader && !prevLeader {
+				log.Printf("Node %s became leader", r.nodeID)
+			}
+		} else {
+			r.leader = r.Heartbeat()
+			if !r.leader && prevLeader {
+				log.Printf("Node %s lost leadership", r.nodeID)
+			}
+		}
+		return r.leader
+	}
+
+	// Try to become leader or follower, but do not fail if not leader
+	for i := 0; i < 5; i++ { // Try for up to 10 seconds (5 * 2s)
+		select {
+		case <-r.stop:
+			return nil // Exit the loop if stop signal is received
+		default:
+			tryElection()
+			time.Sleep(2 * time.Second)
+		}
+	}
+	// Continue running election loop in background
 	go func() {
 		for {
 			select {
 			case <-r.stop:
 				return
 			default:
-				r.mu.Lock()
-				prevLeader := r.leader
-				if !prevLeader {
-					r.leader = r.TryBecomeLeader()
-					if r.leader && !prevLeader {
-						log.Printf("Node %s became leader", r.nodeID)
-					}
-				} else {
-					r.leader = r.Heartbeat()
-					if !r.leader && prevLeader {
-						log.Printf("Node %s lost leadership", r.nodeID)
-					}
-				}
-				r.mu.Unlock()
+				tryElection()
 				time.Sleep(2 * time.Second)
 			}
 		}
 	}()
+	return nil
 }
 
 func (r *RedisLeaderElectionStrategy) TryBecomeLeader() bool {

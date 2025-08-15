@@ -7,23 +7,23 @@ import (
 )
 
 type LeaderElection interface {
-	Start()
+	Start() error
 	IsLeader() bool
 	GetLeader() string
 	Stop()
 	NodeId() string
 }
 
-type LeaderElectionService struct {
+type ElectionService struct {
 	strategy LeaderElection
 }
 
-func NewLeaderElectionService(cfg *conf.Config, redisClient *redis.Client) *LeaderElectionService {
+func NewLeaderElectionService(cfg *conf.Config, redisClient *redis.Client) *ElectionService {
 	var strategy LeaderElection
 	if cfg.ConsensusType == "redis" {
 		strategy = NewRedisLeaderElectionStrategy(redisClient, cfg.NodeID)
 	} else if cfg.ConsensusType == "raft" {
-		le, err := NewRaftLeaderElectionStrategy(cfg.RaftDataDir, cfg.NodeID, cfg.RaftBindAddr, []string{})
+		le, err := NewRaftLeaderElectionStrategy(cfg.RaftDataDir, cfg.NodeID, cfg.RaftBindAddr, cfg.Peers)
 		if err != nil {
 			log.Fatalf("Failed to create Raft leader election: %v", err)
 		}
@@ -31,25 +31,25 @@ func NewLeaderElectionService(cfg *conf.Config, redisClient *redis.Client) *Lead
 	} else {
 		log.Fatalf("Unsupported leader election type: %s", cfg.ConsensusType)
 	}
-	return &LeaderElectionService{strategy: strategy}
+	return &ElectionService{strategy: strategy}
 }
 
-func (s *LeaderElectionService) Start() {
-	s.strategy.Start()
+func (s *ElectionService) Start() error {
+	return s.strategy.Start()
 }
 
-func (s *LeaderElectionService) Stop() {
+func (s *ElectionService) Stop() {
 	s.strategy.Stop()
 }
 
-func (s *LeaderElectionService) IsLeader() bool {
+func (s *ElectionService) IsLeader() bool {
 	return s.strategy.IsLeader()
 }
 
-func (s *LeaderElectionService) GetLeader() string {
+func (s *ElectionService) GetLeader() string {
 	return s.strategy.GetLeader()
 }
 
-func (s *LeaderElectionService) NodeId() string {
+func (s *ElectionService) NodeId() string {
 	return s.strategy.NodeId()
 }

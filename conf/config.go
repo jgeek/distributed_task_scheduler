@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -14,7 +15,11 @@ type Config struct {
 	WorkerCount   int
 	RaftBindAddr  string
 	RaftDataDir   string
-	RaftBootstrap bool
+	Peers         []Peer // For Raft, list of initial nodes
+}
+type Peer struct {
+	ID   string
+	Addr string
 }
 
 func LoadConfig() *Config {
@@ -24,11 +29,51 @@ func LoadConfig() *Config {
 		ListenAddr:    getEnv("LISTEN_ADDR", ":8080"),
 		NodeID:        nodeID,
 		ConsensusType: getEnv("CONSENSUS_TYPE", "raft"), // "redis" or "raft"
-		RaftBootstrap: getBoolEnv("RAFT_BOOTSTRAP", false),
 		WorkerCount:   getEnvInt("WORKER_COUNT", 4),
 		RaftBindAddr:  getEnv("RAFT_BIND_ADDR", "127.0.0.1:9000"), // Use full address instead of just port
 		RaftDataDir:   getEnv("RAFT_DATA_DIR", fmt.Sprintf("/tmp/raft-%s", nodeID)),
+		Peers:         getPeers(getStringSliceEnv("RAFT_NODES", "")),
 	}
+}
+
+func getPeers(peers []string) []Peer {
+	if len(peers) == 0 {
+		return nil
+	}
+	peerList := make([]Peer, 0, len(peers))
+	for _, p := range peers {
+		parts := strings.SplitN(p, ":", 2)
+		if len(parts) != 2 {
+			fmt.Printf("Invalid peer format: %s, expected format is ID:Addr\n", p)
+			continue
+		}
+		peerList = append(peerList, Peer{ID: strings.TrimSpace(parts[0]), Addr: strings.TrimSpace(parts[1])})
+	}
+	return peerList
+}
+
+func getStringSliceEnv(key string, def string) []string {
+	if v := os.Getenv(key); v != "" {
+		return splitString(v)
+	}
+	if def != "" {
+		return splitString(def)
+	}
+	return nil
+}
+
+func splitString(v string) []string {
+	if v == "" {
+		return nil
+	}
+	parts := make([]string, 0)
+	for _, part := range strings.Split(v, ",") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return parts
 }
 
 func getBoolEnv(key string, def bool) bool {
