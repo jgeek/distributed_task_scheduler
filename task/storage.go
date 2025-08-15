@@ -10,37 +10,37 @@ import (
 
 const redisTaskPrefix = "task:"
 
-type TaskStore struct {
+type Store struct {
 	client *redis.Client
 }
 
-func NewTaskStore(c *redis.Client) *TaskStore {
-	return &TaskStore{client: c}
+func NewTaskStore(c *redis.Client) *Store {
+	return &Store{client: c}
 }
 
-func (ts *TaskStore) SaveTask(task *Task) error {
+func (s *Store) SaveTask(task *Task) error {
 	ctx := context.Background()
 	data, err := json.Marshal(task)
 	if err != nil {
 		return err
 	}
-	return ts.client.Set(ctx, redisTaskPrefix+task.ID, data, 0).Err()
+	return s.client.Set(ctx, redisTaskPrefix+task.ID, data, 0).Err()
 }
 
-func (ts *TaskStore) DeleteTask(id string) error {
+func (s *Store) DeleteTask(id string) error {
 	ctx := context.Background()
-	return ts.client.Del(ctx, redisTaskPrefix+id).Err()
+	return s.client.Del(ctx, redisTaskPrefix+id).Err()
 }
 
-func (ts *TaskStore) LoadPendingTasks() ([]*Task, error) {
+func (s *Store) LoadPendingTasks() ([]*Task, error) {
 	ctx := context.Background()
-	keys, err := ts.client.Keys(ctx, redisTaskPrefix+"*").Result()
+	keys, err := s.client.Keys(ctx, redisTaskPrefix+"*").Result()
 	if err != nil {
 		return nil, err
 	}
 	tasks := []*Task{}
 	for _, key := range keys {
-		val, err := ts.client.Get(ctx, key).Result()
+		val, err := s.client.Get(ctx, key).Result()
 		if err != nil {
 			continue
 		}
@@ -53,18 +53,18 @@ func (ts *TaskStore) LoadPendingTasks() ([]*Task, error) {
 	return tasks, nil
 }
 
-func (ts *TaskStore) Get(id string) (*Task, error) {
+func (s *Store) Get(id string) (*Task, error) {
 	ctx := context.Background()
-	val, err := ts.client.Get(ctx, redisTaskPrefix+id).Result()
+	val, err := s.client.Get(ctx, redisTaskPrefix+id).Result()
 	t := &Task{}
 	if err = json.Unmarshal([]byte(val), t); err != nil {
 		return nil, err
 	}
 	return t, nil
 }
-func (ts *TaskStore) GetTaskStatus(id string) (Status, error) {
+func (s *Store) GetTaskStatus(id string) (Status, error) {
 	ctx := context.Background()
-	val, err := ts.client.Get(ctx, redisTaskPrefix+id).Result()
+	val, err := s.client.Get(ctx, redisTaskPrefix+id).Result()
 	t := &Task{}
 	if err = json.Unmarshal([]byte(val), t); err != nil {
 		return "", err
@@ -73,7 +73,7 @@ func (ts *TaskStore) GetTaskStatus(id string) (Status, error) {
 }
 
 // UpdateStatus updates the status of a task by its ID.
-func (s *TaskStore) UpdateStatus(id string, status Status) error {
+func (s *Store) UpdateStatus(id string, status Status) error {
 	ctx := context.Background()
 	key := redisTaskPrefix + id
 	// Get the task

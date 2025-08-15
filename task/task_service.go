@@ -7,15 +7,15 @@ import (
 
 type TaskService struct {
 	Queue *PriorityQueue
-	Store *TaskStore
+	Store *Store
 }
 
-func NewTaskService(queue *PriorityQueue, store *TaskStore) *TaskService {
+func NewTaskService(queue *PriorityQueue, store *Store) *TaskService {
 	return &TaskService{Queue: queue, Store: store}
 }
 
 func (s *TaskService) SubmitTask(priorityStr string, payload []byte) (string, error) {
-	var priority TaskPriority
+	var priority Priority
 	switch priorityStr {
 	case "high":
 		priority = PriorityHigh

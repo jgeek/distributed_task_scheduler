@@ -13,7 +13,7 @@ const (
 	PriorityLow
 )
 
-type TaskPriority int
+type Priority int
 type Status string
 
 const (
@@ -25,22 +25,22 @@ const (
 
 type Task struct {
 	ID        string          `json:"id"`
-	Priority  TaskPriority    `json:"priority"`
+	Priority  Priority        `json:"priority"`
 	Payload   json.RawMessage `json:"payload"`
 	Status    Status          `json:"status"`
 	CreatedAt time.Time       `json:"created_at"`
 }
 
-// TaskItem wraps Task for heap operations
+// Item wraps Task for heap operations
 // Lower index = higher priority
-type TaskItem struct {
+type Item struct {
 	Task  *Task
 	Index int // heap index
 }
 
 // PriorityQueue implements heap.Interface and holds taskItems
 type PriorityQueue struct {
-	items []*TaskItem
+	items []*Item
 	lock  sync.Mutex
 }
 
@@ -59,7 +59,7 @@ func (pq *PriorityQueue) Swap(i, j int) {
 	pq.items[j].Index = j
 }
 func (pq *PriorityQueue) Push(x interface{}) {
-	item := x.(*TaskItem)
+	item := x.(*Item)
 	item.Index = len(pq.items)
 	pq.items = append(pq.items, item)
 }
@@ -74,7 +74,7 @@ func (pq *PriorityQueue) Pop() interface{} {
 func (pq *PriorityQueue) SafePush(task *Task) {
 	pq.lock.Lock()
 	defer pq.lock.Unlock()
-	heap.Push(pq, &TaskItem{Task: task})
+	heap.Push(pq, &Item{Task: task})
 }
 
 func (pq *PriorityQueue) SafePop() *Task {
@@ -83,7 +83,7 @@ func (pq *PriorityQueue) SafePop() *Task {
 	if pq.Len() == 0 {
 		return nil
 	}
-	item := heap.Pop(pq).(*TaskItem)
+	item := heap.Pop(pq).(*Item)
 	return item.Task
 }
 
