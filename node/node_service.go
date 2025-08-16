@@ -55,7 +55,7 @@ func (s *Service) LoadPendingTasks() {
 	pendingTasks, err := s.taskService.LoadPendingTasks()
 	if err == nil {
 		for _, t := range pendingTasks {
-			s.taskService.SafePush(t)
+			s.taskService.Add(t)
 		}
 		log.Printf("Loaded %d pending tasks from Redis", len(pendingTasks))
 	}
@@ -123,7 +123,7 @@ func (s *Service) LoadNewlyAddedTaskFromRedis(ctx context.Context) {
 			return false
 		}
 		taskIDsInQueue[task.ID] = struct{}{}
-		s.taskService.SafePush(task)
+		s.taskService.Add(task)
 		return true
 	}
 

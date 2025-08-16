@@ -10,7 +10,7 @@ type Service interface {
 	SubmitTask(priorityStr string, payload []byte) (string, error)
 	GetTaskStatus(id string) (Status, error)
 	QueueLen() int
-	SafePush(task *Task)
+	Add(task *Task)
 	LoadPendingTasks() ([]*Task, error)
 }
 
@@ -24,7 +24,7 @@ func (s *TaskService) LoadPendingTasks() ([]*Task, error) {
 	return s.Store.LoadPendingTasks()
 }
 
-func (s *TaskService) SafePush(task *Task) {
+func (s *TaskService) Add(task *Task) {
 	s.Queue.SafePush(task)
 }
 
