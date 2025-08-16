@@ -92,6 +92,7 @@ curl 'http://localhost:8081/status?id=<task-id>'
 
 ### Raft leader election (profile: raft)
 
+Split brain issues occur when starting multiple nodes. The Raft implementation is not fully functional yet.
 This runs 2 nodes (raft-node1, raft-node2) plus Redis. The nodes form a Raft cluster.
 
 ```
