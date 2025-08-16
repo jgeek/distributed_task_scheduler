@@ -7,6 +7,7 @@ import (
 	"distributed_task_scheduler/leader"
 	"distributed_task_scheduler/node"
 	"distributed_task_scheduler/task"
+	"errors"
 	"github.com/redis/go-redis/v9"
 	"log"
 	"net/http"
@@ -36,9 +37,6 @@ func main() {
 	}
 
 	handlers.RegisterRESTEndpoints(cfg, nodeService)
-
-	log.Printf("Node %s starting on %s (leader election: %s)", cfg.NodeID, cfg.ListenAddr, cfg.ConsensusType)
-
 	server := setupServer(cfg)
 
 	quit := make(chan os.Signal, 1)
@@ -53,7 +51,7 @@ func main() {
 func setupServer(cfg *conf.Config) *http.Server {
 	server := &http.Server{Addr: cfg.ListenAddr}
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("ListenAndServe: %v", err)
 		}
 	}()
