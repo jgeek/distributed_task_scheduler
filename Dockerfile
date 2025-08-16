@@ -28,6 +28,8 @@ WORKDIR /root/
 
 # Copy the built binary from builder
 COPY --from=builder /app/app .
+# Copy Swagger docs so they are available at runtime
+COPY --from=builder /app/docs ./docs
 
 # Expose port (change if your app uses a different port)
 EXPOSE 8080
