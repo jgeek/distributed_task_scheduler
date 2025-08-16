@@ -10,13 +10,13 @@ import (
 type WorkerPool struct {
 	NumWorkers int
 	Queue      *task.PriorityQueue
-	Store      *task.Store
+	Store      task.Store
 	stopCh     chan struct{}
 	isRunning  bool
 	mu         sync.Mutex
 }
 
-func NewWorkerPool(num int, queue *task.PriorityQueue, store *task.Store) *WorkerPool {
+func NewWorkerPool(num int, queue *task.PriorityQueue, store task.Store) *WorkerPool {
 	return &WorkerPool{
 		NumWorkers: num,
 		Queue:      queue,

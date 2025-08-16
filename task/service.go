@@ -17,7 +17,7 @@ type Service interface {
 // TaskService implements the Service interface
 type TaskService struct {
 	Queue *PriorityQueue
-	Store *Store
+	Store Store
 }
 
 func (s *TaskService) LoadPendingTasks() ([]*Task, error) {
@@ -29,7 +29,7 @@ func (s *TaskService) Add(task *Task) {
 }
 
 // NewTaskService creates a new task service that implements Service interface
-func NewTaskService(queue *PriorityQueue, store *Store) Service {
+func NewTaskService(queue *PriorityQueue, store Store) Service {
 	return &TaskService{Queue: queue, Store: store}
 }
 

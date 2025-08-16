@@ -6,19 +6,30 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// ------------------ Persistence Layer (Redis) ------------------
+// ------------------ Persistence Layer ------------------
 
 const redisTaskPrefix = "task:"
 
-type Store struct {
+// Store defines the interface for task storage operations
+type Store interface {
+	SaveTask(task *Task) error
+	DeleteTask(id string) error
+	LoadPendingTasks() ([]*Task, error)
+	Get(id string) (*Task, error)
+	GetTaskStatus(id string) (Status, error)
+	UpdateStatus(id string, status Status) error
+}
+
+// RedisStore implements the Store interface using Redis
+type RedisStore struct {
 	client *redis.Client
 }
 
-func NewTaskStore(c *redis.Client) *Store {
-	return &Store{client: c}
+func NewTaskStore(c *redis.Client) Store {
+	return &RedisStore{client: c}
 }
 
-func (s *Store) SaveTask(task *Task) error {
+func (s *RedisStore) SaveTask(task *Task) error {
 	ctx := context.Background()
 	data, err := json.Marshal(task)
 	if err != nil {
@@ -27,12 +38,12 @@ func (s *Store) SaveTask(task *Task) error {
 	return s.client.Set(ctx, redisTaskPrefix+task.ID, data, 0).Err()
 }
 
-func (s *Store) DeleteTask(id string) error {
+func (s *RedisStore) DeleteTask(id string) error {
 	ctx := context.Background()
 	return s.client.Del(ctx, redisTaskPrefix+id).Err()
 }
 
-func (s *Store) LoadPendingTasks() ([]*Task, error) {
+func (s *RedisStore) LoadPendingTasks() ([]*Task, error) {
 	ctx := context.Background()
 	keys, err := s.client.Keys(ctx, redisTaskPrefix+"*").Result()
 	if err != nil {
@@ -53,7 +64,7 @@ func (s *Store) LoadPendingTasks() ([]*Task, error) {
 	return tasks, nil
 }
 
-func (s *Store) Get(id string) (*Task, error) {
+func (s *RedisStore) Get(id string) (*Task, error) {
 	ctx := context.Background()
 	val, err := s.client.Get(ctx, redisTaskPrefix+id).Result()
 	t := &Task{}
@@ -62,7 +73,7 @@ func (s *Store) Get(id string) (*Task, error) {
 	}
 	return t, nil
 }
-func (s *Store) GetTaskStatus(id string) (Status, error) {
+func (s *RedisStore) GetTaskStatus(id string) (Status, error) {
 	ctx := context.Background()
 	val, err := s.client.Get(ctx, redisTaskPrefix+id).Result()
 	t := &Task{}
@@ -73,7 +84,7 @@ func (s *Store) GetTaskStatus(id string) (Status, error) {
 }
 
 // UpdateStatus updates the status of a task by its ID.
-func (s *Store) UpdateStatus(id string, status Status) error {
+func (s *RedisStore) UpdateStatus(id string, status Status) error {
 	ctx := context.Background()
 	key := redisTaskPrefix + id
 	// Get the task
