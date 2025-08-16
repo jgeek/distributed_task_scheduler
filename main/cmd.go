@@ -25,8 +25,8 @@ func main() {
 	store := task.NewTaskStore(redisClient)
 	taskService := task.NewTaskService(queue, store)
 	workerPool := node.NewWorkerPool(cfg.WorkerCount, queue, store)
-	leaderService := leader.NewLeaderElectionService(cfg, redisClient)
-	nodeService := node.NewService(taskService, workerPool, leaderService)
+	strategy := leader.NewLeaderElectionService(cfg, redisClient)
+	nodeService := node.NewService(taskService, workerPool, strategy)
 
 	defer nodeService.Close()
 

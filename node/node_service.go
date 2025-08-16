@@ -10,21 +10,21 @@ import (
 )
 
 type Service struct {
-	taskService   *task.TaskService
-	leaderService *leader.ElectionService
-	pool          *WorkerPool
+	taskService      task.Service
+	electionStrategy leader.Strategy
+	pool             *WorkerPool
 }
 
-func NewService(taskService *task.TaskService, pool *WorkerPool, leaderService *leader.ElectionService) *Service {
+func NewService(taskService task.Service, pool *WorkerPool, leaderService leader.Strategy) *Service {
 	return &Service{
-		taskService:   taskService,
-		leaderService: leaderService,
-		pool:          pool,
+		taskService:      taskService,
+		electionStrategy: leaderService,
+		pool:             pool,
 	}
 }
 
 func (s *Service) Close() {
-	s.leaderService.Stop()
+	s.electionStrategy.Stop()
 }
 
 func (s *Service) SubmitTask(priority string, payload []byte) (string, error) {
@@ -40,11 +40,11 @@ func (s *Service) QueueLen() int {
 }
 
 func (s *Service) IsLeader() bool {
-	return s.leaderService.IsLeader()
+	return s.electionStrategy.IsLeader()
 }
 
 func (s *Service) LeaderID() string {
-	return s.leaderService.GetLeader()
+	return s.electionStrategy.GetLeader()
 }
 
 func (s *Service) LoadPendingTasks() {
@@ -52,20 +52,20 @@ func (s *Service) LoadPendingTasks() {
 		log.Println("Not leader, skipping loading pending tasks from Redis")
 		return
 	}
-	pendingTasks, err := s.taskService.Store.LoadPendingTasks()
+	pendingTasks, err := s.taskService.LoadPendingTasks()
 	if err == nil {
 		for _, t := range pendingTasks {
-			s.taskService.Queue.SafePush(t)
+			s.taskService.SafePush(t)
 		}
 		log.Printf("Loaded %d pending tasks from Redis", len(pendingTasks))
 	}
 }
 
 func (s *Service) Start(ctx context.Context) error {
-	nodeID := s.leaderService.NodeId()
+	nodeID := s.electionStrategy.NodeId()
 	log.Printf("Starting node service with ID: %s", nodeID)
 
-	err := s.leaderService.Start()
+	err := s.electionStrategy.Start()
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (s *Service) StartWorkerPool(ctx context.Context) {
 	var workerMu sync.Mutex
 
 	taskProcessor := func(task *task.Task) error {
-		log.Printf("Node: %s, processing task %s with priority %d", s.leaderService.NodeId(), task.ID, task.Priority)
+		log.Printf("Node: %s, processing task %s with priority %d", s.electionStrategy.NodeId(), task.ID, task.Priority)
 		// Simulate task processing
 		time.Sleep(100 * time.Millisecond)
 		return nil
@@ -97,11 +97,11 @@ func (s *Service) StartWorkerPool(ctx context.Context) {
 			case <-ticker.C:
 				workerMu.Lock()
 				if s.IsLeader() && !workerStarted {
-					log.Printf("Node %s became leader, starting worker pool", s.leaderService.NodeId())
+					log.Printf("Node %s became leader, starting worker pool", s.electionStrategy.NodeId())
 					s.pool.Start(taskProcessor)
 					workerStarted = true
 				} else if !s.IsLeader() && workerStarted {
-					log.Printf("Node %s lost leadership, stopping worker pool", s.leaderService.NodeId())
+					log.Printf("Node %s lost leadership, stopping worker pool", s.electionStrategy.NodeId())
 					s.pool.Stop()
 					workerStarted = false
 				}
@@ -123,7 +123,7 @@ func (s *Service) LoadNewlyAddedTaskFromRedis(ctx context.Context) {
 			return false
 		}
 		taskIDsInQueue[task.ID] = struct{}{}
-		s.taskService.Queue.SafePush(task)
+		s.taskService.SafePush(task)
 		return true
 	}
 
@@ -137,7 +137,7 @@ func (s *Service) LoadNewlyAddedTaskFromRedis(ctx context.Context) {
 				return
 			case <-ticker.C:
 				if s.IsLeader() {
-					pendingTasks, err := s.taskService.Store.LoadPendingTasks()
+					pendingTasks, err := s.taskService.LoadPendingTasks()
 					if err == nil {
 						added := 0
 						for _, t := range pendingTasks {

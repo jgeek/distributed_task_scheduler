@@ -5,12 +5,31 @@ import (
 	"time"
 )
 
+// Service defines the interface for task service operations
+type Service interface {
+	SubmitTask(priorityStr string, payload []byte) (string, error)
+	GetTaskStatus(id string) (Status, error)
+	QueueLen() int
+	SafePush(task *Task)
+	LoadPendingTasks() ([]*Task, error)
+}
+
+// TaskService implements the Service interface
 type TaskService struct {
 	Queue *PriorityQueue
 	Store *Store
 }
 
-func NewTaskService(queue *PriorityQueue, store *Store) *TaskService {
+func (s *TaskService) LoadPendingTasks() ([]*Task, error) {
+	return s.Store.LoadPendingTasks()
+}
+
+func (s *TaskService) SafePush(task *Task) {
+	s.Queue.SafePush(task)
+}
+
+// NewTaskService creates a new task service that implements Service interface
+func NewTaskService(queue *PriorityQueue, store *Store) Service {
 	return &TaskService{Queue: queue, Store: store}
 }
 
